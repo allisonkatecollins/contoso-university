@@ -24,9 +24,36 @@ namespace ContosoUniversity.Controllers
 
         // GET: Students
         //get a list of students from the Students entity set by reading the Students property of the DB context instance
-        public async Task<IActionResult> Index()
+        //when the user clicks a column heading hyperlink, the appropriate sortOrder value is provided in the query string
+        public async Task<IActionResult> Index(string sortOrder)
         {
-            return View(await _context.Students.ToListAsync());
+            //ViewData elements are used by the view to configure the column heading hyperlinks with the appropriate query string values
+            //--these are ternary statements
+
+            //specifies that if the sortOrder parameter is null or empty, NameSortParm should be set to name_desc
+            //--
+            ViewData["NameSortParm"] = String.IsNullOrEmpty(sortOrder) ? "name_desc" : "";
+            ViewData["DateSortParm"] = sortOrder == "Date" ? "date_desc" : "Date";
+            var students = from s in _context.Students
+                           select s;
+
+            //default is to display students in ascending order by last name
+            switch (sortOrder)
+            {
+                case "name_desc":
+                    students = students.OrderByDescending(s => s.LastName);
+                    break;
+                case "Date":
+                    students = students.OrderBy(s => s.EnrollmentDate);
+                    break;
+                case "date_desc":
+                    students = students.OrderByDescending(s => s.EnrollmentDate);
+                    break;
+                default:
+                    students = students.OrderBy(s => s.LastName);
+                    break;
+            }
+            return View(await students.AsNoTracking().ToListAsync());
         }
 
         // GET: Students/Details/5
