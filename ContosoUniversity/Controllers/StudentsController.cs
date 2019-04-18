@@ -146,7 +146,9 @@ namespace ContosoUniversity.Controllers
         }
 
         // GET: Students/Delete/5
-        public async Task<IActionResult> Delete(int? id)
+        // the method that's called in response to a GET request displays a view that gives the user a chance to approve or cancel the delete
+        //if approved, POST method is created
+        public async Task<IActionResult> Delete(int? id, bool? saveChangesError = false)
         {
             if (id == null)
             {
@@ -154,29 +156,50 @@ namespace ContosoUniversity.Controllers
             }
 
             var student = await _context.Students
+                .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ID == id);
             if (student == null)
             {
                 return NotFound();
             }
 
+            if (saveChangesError.GetValueOrDefault())
+            {
+                ViewData["ErrorMessage"] =
+                    "Delete failed. Try again, and if the problem persists " +
+                    "see your system administrator.";
+            }
+
             return View(student);
         }
 
         // POST: Students/Delete/5
+        //if error occurs, HttpPost Delete method calls the HttpGet Delete method
+        //--passes a parameter that indicates that an error has occurred
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        //perform delete operation and catch any DB update errors
+        //retrieve selected entity, then call the Remove method to set entity's status to Delete
+        //when SaveChanges is called, a SQL DELETE command is generated
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var student = await _context.Students.FindAsync(id);
-            _context.Students.Remove(student);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
+            if (student == null)
+            {
+                return RedirectToAction(nameof(Index));
+            }
 
-        private bool StudentExists(int id)
-        {
-            return _context.Students.Any(e => e.ID == id);
+            try
+            {
+                _context.Students.Remove(student);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch (DbUpdateException /* ex */)
+            {
+                //Log the error (uncomment ex variable name and write a log.)
+                return RedirectToAction(nameof(Delete), new { id = id, saveChangesError = true });
+            }
         }
     }
 }
