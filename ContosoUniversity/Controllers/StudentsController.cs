@@ -25,15 +25,39 @@ namespace ContosoUniversity.Controllers
         // GET: Students
         //get a list of students from the Students entity set by reading the Students property of the DB context instance
         //when the user clicks a column heading hyperlink, the appropriate sortOrder value is provided in the query string
-        public async Task<IActionResult> Index(string sortOrder, string searchString)
+        //if user hasn't clicked a paging or sorting link, all parameters will be null
+        //--if a paging link is clicked, the page variable will contain the page number to display
+        public async Task<IActionResult> Index(
+            string sortOrder,
+            string currentFilter,
+            string searchString,
+            int? pageNumber)
         {
             //ViewData elements are used by the view to configure the column heading hyperlinks with the appropriate query string values
-            //--these are ternary statements
+            
+            //provides view with the current sort order
+            //--this must be included in the paging links in order to keep the sort order the same while paging
+            ViewData["CurrentSort"] = sortOrder;
 
             //specifies that if the sortOrder parameter is null or empty, NameSortParm should be set to name_desc
             //--otherwise it should be set to an empty string
             ViewData["NameSortParm"] = String.IsNullOrEmpty(sortOrder) ? "name_desc" : "";
             ViewData["DateSortParm"] = sortOrder == "Date" ? "date_desc" : "Date";
+
+            //if the search string is changed during paging, the page has to be reset to 1
+            //--because the new filter can result in different data to display
+            if (searchString != null)
+            {
+                pageNumber = 1;
+            }
+            else
+            {
+                searchString = currentFilter;
+            }
+
+            //provides view with the current filter string
+            //this value must be included in the paging links in order to maintain the filter settings during paging
+            //must also be restored to the text box when the page is redisplayed
             ViewData["CurrentFilter"] = searchString;
 
             var students = from s in _context.Students
@@ -61,7 +85,13 @@ namespace ContosoUniversity.Controllers
                     students = students.OrderBy(s => s.LastName);
                     break;
             }
-            return View(await students.AsNoTracking().ToListAsync());
+
+            int pageSize = 3;
+            //convert the student query to a single page of students in a collection type that supports paging
+            //that single page of students is then passed to the view
+            //?? represents the null-coalescing operator, which defines a default value for a nullable type
+                //return the value of pageNumber if it has a value, or return 1 if pageNumber is null
+            return View(await PaginatedList<Student>.CreateAsync(students.AsNoTracking(), pageNumber ?? 1, pageSize));
         }
 
         // GET: Students/Details/5
